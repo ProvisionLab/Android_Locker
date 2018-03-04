@@ -57,6 +57,9 @@
         <activity
             android:name=".activity.MainActivity"
             android:screenOrientation="portrait" />
-    </application>
 
+        <activity
+            android:name=".activity.LockNoPasscode"
+            android:screenOrientation="portrait" />
+    </application>
 </manifest>
