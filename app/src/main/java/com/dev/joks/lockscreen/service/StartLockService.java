@@ -5,11 +5,13 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.os.IBinder;
+import android.provider.Settings;
 import android.util.Log;
 
-import com.dev.joks.lockscreen.Lockscreen;
 import com.dev.joks.lockscreen.LockscreenUtil;
 import com.dev.joks.lockscreen.SharedPrefsUtil;
+import com.dev.joks.lockscreen.activity.LockNoPasscode;
+import com.dev.joks.lockscreen.activity.PermissionActivity;
 import com.dev.joks.lockscreen.event.ServiceStoppedEvent;
 
 import org.greenrobot.eventbus.EventBus;
@@ -19,8 +21,11 @@ import org.greenrobot.eventbus.ThreadMode;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import static com.dev.joks.lockscreen.Lockscreen.ISLOCK;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action1;
+
 import static com.dev.joks.lockscreen.activity.MainActivity.HOURS;
+import static com.dev.joks.lockscreen.activity.MainActivity.ISLOCK;
 import static com.dev.joks.lockscreen.activity.MainActivity.MINUTES;
 import static com.dev.joks.lockscreen.activity.MainActivity.SECONDS;
 
@@ -46,16 +51,11 @@ public class StartLockService extends Service {
         minutes = SharedPrefsUtil.getIntData(this, MINUTES);
         seconds = SharedPrefsUtil.getIntData(this, SECONDS);
 
-        Log.d(TAG, "Time " + hours + " " + minutes + " " + seconds + " " + (hours + minutes + seconds) * TO_MILLISECONDS);
-
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
                 SharedPrefsUtil.putBooleanData(StartLockService.this, ISLOCK, true);
-
-                if (!LockscreenUtil.isServiceRunning(LockScreenService.class, StartLockService.this)) {
-                    Lockscreen.getInstance(StartLockService.this).startLockscreenService();
-                }
+                startLock();
                 Log.d(TAG, "Timer started");
             }
         }, (hours * 3600 + minutes * 60 + seconds) * TO_MILLISECONDS);
@@ -75,11 +75,8 @@ public class StartLockService extends Service {
             @Override
             public void run() {
                 SharedPrefsUtil.putBooleanData(StartLockService.this, ISLOCK, true);
-
-                if (!LockscreenUtil.isServiceRunning(LockScreenService.class, StartLockService.this)) {
-                    Lockscreen.getInstance(StartLockService.this).startLockscreenService();
-                }
                 Log.d(TAG, "Message get! Timer started");
+                startLock();
             }
         }, (hours * 3600 + minutes * 60 + seconds) * TO_MILLISECONDS);
     }
@@ -92,5 +89,32 @@ public class StartLockService extends Service {
         Log.d(TAG, "Stop Main Service");
 
         ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).cancel(1);
+    }
+
+    private void startLock() {
+        final Intent intent = new Intent(StartLockService.this, LockNoPasscode.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                Intent permissionActivityIntent = new Intent(this, PermissionActivity.class);
+                permissionActivityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(permissionActivityIntent);
+
+                LockscreenUtil.getInstance(this).getPermissionCheckSubject()
+                        .subscribeOn(AndroidSchedulers.mainThread())
+                        .subscribe(
+                                new Action1<Boolean>() {
+                                    @Override
+                                    public void call(Boolean aBoolean) {
+                                        startActivity(intent);
+                                    }
+                                }
+                        );
+            } else {
+                startActivity(intent);
+            }
+        } else {
+            startActivity(intent);
+        }
     }
 }

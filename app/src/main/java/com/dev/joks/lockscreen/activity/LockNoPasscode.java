@@ -1,67 +1,48 @@
 package com.dev.joks.lockscreen.activity;
 
-import android.animation.Animator;
-import android.app.Activity;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
-import android.net.Uri;
-import android.os.BatteryManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.support.v4.app.FragmentActivity;
-import android.support.v4.view.PagerAdapter;
-import android.support.v4.view.ViewPager;
 import android.telephony.PhoneStateListener;
-import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
-import android.widget.ImageView;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
 import android.widget.RelativeLayout;
-import android.widget.TextView;
+import android.widget.Toast;
 
 import com.dev.joks.lockscreen.R;
 import com.dev.joks.lockscreen.Values;
-import com.romainpiel.shimmer.Shimmer;
-import com.romainpiel.shimmer.ShimmerTextView;
+import com.dev.joks.lockscreen.event.ServiceStoppedEvent;
 
-import java.util.Calendar;
+import net.yslibrary.android.keyboardvisibilityevent.util.UIUtil;
+
+import org.greenrobot.eventbus.EventBus;
+
+import java.io.File;
 
 public class LockNoPasscode extends FragmentActivity implements View.OnClickListener {
-    private View screen;
-    private static RelativeLayout layout = null;
-    //    private ImageView imgCamera;
-    private int mScreenWidth = 0;
+
+    private static final String TAG = LockNoPasscode.class.getSimpleName();
+    private static final String INTERFACE_NAME = "Android";
+    private RelativeLayout layout;
     private WindowManager.LayoutParams wmParams;
     private static WindowManager mWindowManager = null;
-    private ViewPager pager;
-    private TextView tvTime;
-    private ImageView imgBackground;
-
-    private TextView tvDate;
-    private ShimmerTextView tvShimmer;
-    private Shimmer shimmer;
-    private View vPassCode, vLock;
-    private ImageView imgSignal, imgWifi, imgBattery, imgCharging;
-    private TextView tvOperatorName, tvBattery;
     private SharedPreferences sharedPreferences;
-    private TextView tvFormat;
-    private static boolean isCall = false;
     public static boolean booleanisCall = false;
-
+    private String hiddenPass;
     private boolean hasPassCode = false;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,177 +54,28 @@ public class LockNoPasscode extends FragmentActivity implements View.OnClickList
             Log.e("..............", "oncreate return");
             return;
         }
-        layout = (RelativeLayout) View.inflate(this, R.layout.activity_lock2, null);
-        pager = (ViewPager) layout.findViewById(R.id.pager);
-//        pager.setOffscreenPageLimit(2);
-        pager.setAdapter(new MyPagerAdapter(this));
-        pager.post(new Runnable() {
-            @Override
-            public void run() {
-                pager.setCurrentItem(1, false);
-            }
-        });
+        layout = (RelativeLayout) View.inflate(this, R.layout.activity_lock, null);
 
         LayoutInflater layoutInflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-//        vPassCode = layoutInflater.inflate(R.layout.fragment_lock_passcode, null);
 
-        vPassCode = layoutInflater.inflate(R.layout.view_null, null);
-
-        vLock = layoutInflater.inflate(R.layout.fragment_lock, null);
-        bindView();
-        setTvShimmer();
         mWindowAddView();
 
+        WebView webView = (WebView) layout.findViewById(R.id.webview);
+        WebSettings webSettings = webView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+        webSettings.setDisplayZoomControls(true);
+        webView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
+        webView.addJavascriptInterface(new CustomJavascriptInterface(this), INTERFACE_NAME);
+        webView.loadUrl("file:///" + Environment.getExternalStorageDirectory().toString() + File.separator + "LockScreen/lock_screen.html");
 
-        pager.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
-            boolean start = false;
-
-            @Override
-            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-                Log.e(".............", positionOffset + " " + position);
-//                if(start){
-//                    if (positionOffset < 0.5f) {
-//                    unlock();
-//                }
-//                }
-//                if(positionOffset>0.5f){
-//                    if(positionOffset<)
-//                }
-//                if (position==1&&positionOffset > 0.5f) {
-//                    unlock();
-//                }
-            }
-
-            @Override
-            public void onPageSelected(int position) {
-                Log.e(".............", position + "");
-                if (position == 0) {
-                    unlock();
-                    if (telephony != null && customPhoneListener != null)
-                        telephony.listen(customPhoneListener, PhoneStateListener.LISTEN_NONE);
-                }
-//                if (position == 0) {
-//                    start = false;
-//                } else start = true;
-//}
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int state) {
-
-            }
-        });
         telephony = (TelephonyManager) getSystemService(Service.TELEPHONY_SERVICE); //TelephonyManager object
         customPhoneListener = new CustomPhoneStateListener();
         telephony.listen(customPhoneListener, PhoneStateListener.LISTEN_CALL_STATE);
-//        broadcastCall = new BroadcastCall();
-//        registerReceiver(broadcastCall, new IntentFilter("android.intent.action.PHONE_STATE"));
-        setTime();
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_BATTERY_CHANGED);
-        filter.addAction(Intent.ACTION_TIME_TICK);
-        filter.addAction(Intent.ACTION_TIMEZONE_CHANGED);
-        registerReceiver(broadcast, filter);
-//        screenOff = new ScreenOff();
-//        registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF));
-    }
-
-    //    ScreenOff screenOff;
-//
-    private void bindView() {
-        tvShimmer = (ShimmerTextView) vLock.findViewById(R.id.shimmer_tv);
-        tvDate = (TextView) vLock.findViewById(R.id.tvDate);
-        tvTime = (TextView) vLock.findViewById(R.id.tvTime);
-
-        imgSignal = (ImageView) layout.findViewById(R.id.imgSignal);
-        imgWifi = (ImageView) layout.findViewById(R.id.imgWifi);
-        imgBattery = (ImageView) layout.findViewById(R.id.imgBattery);
-        imgCharging = (ImageView) layout.findViewById(R.id.imgCharging);
-        tvOperatorName = (TextView) layout.findViewById(R.id.tvOperatorName);
-        tvBattery = (TextView) layout.findViewById(R.id.tvBattery);
-        setStatusBar();
-        imgBackground = (ImageView) layout.findViewById(R.id.imgBackground);
-        boolean isResource = sharedPreferences.getBoolean(Values.BACKGROUND_RESOUECE_BOLEAN, true);
-        int idBackground = sharedPreferences.getInt(Values.BACKGROUND_RESOURCE_ID, 0);
-
-        if (!isResource) {
-//                setWallpaper();
-//                Uri uri = Uri.parse(preferences.getString(Values.BACKGROUND_URI, ""));
-//                this.background.setImageURI(uri);
-
-            Uri imageUri = Uri.parse(sharedPreferences.getString(Values.BACKGROUND_URI, ""));
-
-            Drawable myDrawable = Drawable.createFromPath(sharedPreferences.getString(Values.BACKGROUND_URI, ""));
-
-            Bitmap bitmap = null;
-            bitmap = ((BitmapDrawable) myDrawable).getBitmap();
-            imgBackground.setImageBitmap(bitmap);
-
-
-//                Uri selectedImageURI = Uri.parse(preferences.getString(Values.BACKGROUND_URI, ""));
-//                InputStream input = getContentResolver().openInputStream(selectedImageURI);
-//                this.background.setImageBitmap(BitmapFactory.decodeStream(input));//
-            // this.background.setImageURI(Uri.parse(preferences.getString(Values.BACKGROUND_URI, "")));
-
-        } else {
-            if (idBackground == 0) {
-                imgBackground.setImageResource(R.drawable.b2);
-            } else {
-                imgBackground.setImageResource(idBackground);
-            }
-        }
-        tvFormat = (TextView) vLock.findViewById(R.id.tvFormat);
-    }
-
-    Broadcast broadcast;
-    TelephonyManager telephonyManager;
-
-    public void setStatusBar() {
-        telephonyManager = (TelephonyManager) this.getSystemService(TELEPHONY_SERVICE);
-        telephonyManager.listen(phoneStateListener, TelephonyManager.PHONE_TYPE_GSM);
-        tvOperatorName.setText(telephonyManager.getNetworkOperatorName());
-        broadcast = new Broadcast();
-    }
-
-    public void setTime() {
-        boolean isTime12 = sharedPreferences.getBoolean(Values.TIME_FORMAT, false);
-        Calendar c = Calendar.getInstance();
-        int hour = c.get(Calendar.HOUR_OF_DAY);
-        int minute = c.get(Calendar.MINUTE);
-        int date = c.get(Calendar.DATE);
-        int dateWeek = c.get(Calendar.DAY_OF_WEEK);
-        int month = c.get(Calendar.MONTH) + 1;
-        String minuteString = minute + "";
-        if (minuteString.length() == 1) {
-            minuteString = "0" + minuteString;
-        }
-
-        if (isTime12) {
-            int hour12 = hour % 12;
-            tvFormat.setVisibility(View.VISIBLE);
-            if (hour > 12) {
-                tvFormat.setText("PM");
-                tvTime.setText(hour12 + ":" + minuteString);
-            } else {
-                tvFormat.setText("AM");
-                tvTime.setText(hour12 + ":" + minuteString);
-            }
-        } else {
-            tvFormat.setVisibility(View.GONE);
-            tvTime.setText(hour + ":" + minuteString);
-        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        try {
-            unregisterReceiver(broadcast);
-//            unregisterReceiver(broadcastCall);
-        } catch (Exception e) {
-        }
-//        unregisterReceiver(screenOff);
     }
 
     public void unlock() {
@@ -251,44 +83,12 @@ public class LockNoPasscode extends FragmentActivity implements View.OnClickList
             if (layout != null)
                 mWindowManager.removeView(layout);
         } catch (Exception e) {
-
+            Log.e(TAG, "Error " + e.getMessage());
         } finally {
             mWindowManager = null;
             finish();
         }
     }
-
-    private void setTvShimmer() {
-        shimmer = new Shimmer();
-        shimmer.setRepeatCount(200)
-                .setDuration(2000)
-                .setStartDelay(1000)
-                .setDirection(Shimmer.ANIMATION_DIRECTION_LTR)
-                .setAnimatorListener(new Animator.AnimatorListener() {
-                    @Override
-                    public void onAnimationStart(Animator animation) {
-
-                    }
-
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-
-                    }
-
-                    @Override
-                    public void onAnimationCancel(Animator animation) {
-
-                    }
-
-                    @Override
-                    public void onAnimationRepeat(Animator animation) {
-
-                    }
-                });
-        shimmer.start(tvShimmer);
-
-    }
-
 
     private void mWindowAddView() {
         mWindowManager = (WindowManager) getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
@@ -306,10 +106,6 @@ public class LockNoPasscode extends FragmentActivity implements View.OnClickList
                 | View.SYSTEM_UI_FLAG_IMMERSIVE;
         layout.setSystemUiVisibility(uiOptions);
         mWindowManager.addView(layout, wmParams);
-//        Animation animation = AnimationUtils.loadAnimation(this, R.anim.zoom_in_background);
-//        imgBackground.startAnimation(animation);
-
-
     }
 
     @Override
@@ -319,13 +115,9 @@ public class LockNoPasscode extends FragmentActivity implements View.OnClickList
         }
     }
 
-//    private BroadcastCall broadcastCall;
-
     @Override
     protected void onResume() {
         super.onResume();
-
-
     }
 
     @Override
@@ -334,96 +126,6 @@ public class LockNoPasscode extends FragmentActivity implements View.OnClickList
 
     }
 
-
-    public class MyPagerAdapter extends PagerAdapter {
-        Activity context;
-//        LockHasPasscode lock2;
-
-
-        public MyPagerAdapter(Activity context) {
-            this.context = context;
-//            lock2 = (LockHasPasscode) context;
-        }
-
-
-        @Override
-        public int getCount() {
-            return 2;
-        }
-
-        @Override
-        public boolean isViewFromObject(View view, Object object) {
-            return view == object;
-        }
-
-        @Override
-        public Object instantiateItem(ViewGroup collection, int position) {
-
-
-            ((ViewPager) collection).addView(vLock, 0);
-            ((ViewPager) collection).addView(vPassCode, 1);
-            switch (position) {
-                case 0:
-                    return vPassCode;
-                case 1:
-                    return vLock;
-            }
-            return vLock;
-        }
-
-        public int getItemPosition(Object obj) {
-            return obj == vPassCode ? 0 : obj == vLock ? 1 : -1;
-        }
-
-        @Override
-        public void destroyItem(ViewGroup collection, int position, Object view) {
-            ((ViewPager) collection).removeView((View) view);
-        }
-
-
-    }
-
-    class Broadcast extends BroadcastReceiver {
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-
-            String action = intent.getAction();
-            if (action.equals(Intent.ACTION_BATTERY_CHANGED)) {
-                int intExtra = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
-                int plugin = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
-                tvBattery.setText(intExtra + "%");
-                return;
-
-            } else if (action.equals(Intent.ACTION_TIME_CHANGED) || action.equals(Intent.ACTION_TIME_TICK) || action.equals(Intent.ACTION_TIMEZONE_CHANGED)) {
-                setTime();
-                return;
-            }
-
-
-//            case Intent.ACTION_POWER_DISCONNECTED:
-//
-//            break;
-//            case Intent.ACTION_TIME_CHANGED:
-//
-//            break;
-
-
-        }
-    }
-
-    PhoneStateListener phoneStateListener = new PhoneStateListener() {
-        int MAX_SIGNAL_DBM_VALUE = 31;
-
-        @Override
-        public void onSignalStrengthsChanged(SignalStrength signalStrength) {
-            super.onSignalStrengthsChanged(signalStrength);
-        }
-
-        private int calculateSignalStrengthInPercent(int signalStrength) {
-            return (int) ((float) signalStrength / MAX_SIGNAL_DBM_VALUE * 100);
-        }
-    };
     public static boolean isNotFirst = true;
     TelephonyManager telephony;
     CustomPhoneStateListener customPhoneListener;
@@ -536,8 +238,30 @@ public class LockNoPasscode extends FragmentActivity implements View.OnClickList
 //                        //Rejected or Missed call
 //                    }
                         break;
-
                 }
+        }
+    }
+
+    private class CustomJavascriptInterface {
+
+        private Context context;
+
+        CustomJavascriptInterface(Context context) {
+            this.context = context;
+        }
+
+        @JavascriptInterface
+        public void receiveValue(String toast, String hiddenPass) {
+            Log.d(TAG, "Values " + toast + " " + hiddenPass);
+            if (toast.equals(hiddenPass)) {
+                UIUtil.hideKeyboard(LockNoPasscode.this);
+                Toast.makeText(context, "Unlock", Toast.LENGTH_SHORT).show();
+                finish();
+                unlock();
+                EventBus.getDefault().post(new ServiceStoppedEvent());
+            } else {
+                Toast.makeText(LockNoPasscode.this, "Wrong password!", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 }

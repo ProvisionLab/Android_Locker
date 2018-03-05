@@ -30,9 +30,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".activity.LockActivity"
-            android:screenOrientation="portrait" />
 
         <receiver
             android:name=".AdminReceiver"
@@ -50,8 +47,6 @@
             android:name=".activity.PermissionActivity"
             android:screenOrientation="portrait" />
 
-        <service android:name=".service.LockScreenService" />
-        <service android:name=".service.LockScreenViewService" />
         <service android:name=".service.StartLockService" />
 
         <activity

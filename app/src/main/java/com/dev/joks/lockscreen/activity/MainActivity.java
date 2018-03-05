@@ -1,12 +1,15 @@
 package com.dev.joks.lockscreen.activity;
 
 import android.Manifest;
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Environment;
-import android.provider.Settings;
+import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SwitchCompat;
 import android.util.Log;
@@ -18,9 +21,9 @@ import android.widget.Spinner;
 import android.widget.Toast;
 
 import com.dev.joks.lockscreen.AdminReceiver;
-import com.dev.joks.lockscreen.LockscreenUtil;
 import com.dev.joks.lockscreen.R;
 import com.dev.joks.lockscreen.SharedPrefsUtil;
+import com.dev.joks.lockscreen.service.StartLockService;
 import com.karumi.dexter.Dexter;
 import com.karumi.dexter.PermissionToken;
 import com.karumi.dexter.listener.PermissionDeniedResponse;
@@ -33,13 +36,10 @@ import java.io.File;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Action1;
-
-import static com.dev.joks.lockscreen.Lockscreen.ISLOCK;
 
 public class MainActivity extends AppCompatActivity {
 
+    public static final String ISLOCK = "is_lock";
     public static final String HOURS = "hours";
     public static final String MINUTES = "minutes";
     public static final String SECONDS = "seconds";
@@ -127,6 +127,9 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         mSwitchCompat.setChecked(true);
                     }
+                } else {
+                    SharedPrefsUtil.putBooleanData(MainActivity.this, ISLOCK, false);
+                    stopService(new Intent(MainActivity.this, StartLockService.class));
                 }
             }
         });
@@ -201,8 +204,6 @@ public class MainActivity extends AppCompatActivity {
         int minutes = SharedPrefsUtil.getIntData(MainActivity.this, MINUTES);
         int seconds = SharedPrefsUtil.getIntData(MainActivity.this, SECONDS);
 
-        Log.d(TAG, "Time " + hours + " " + minutes + " " + seconds);
-
         hoursSpinner.setSelection(hours == 0 ? hours : hours - 1);
         minutesSpinner.setSelection(minutes == 0 ? minutes : minutes - 1);
         secondsSpinner.setSelection(seconds == 0 ? seconds : seconds - 1);
@@ -240,60 +241,33 @@ public class MainActivity extends AppCompatActivity {
                 }
                 break;
             case R.id.close_btn:
-//                if (mSwitchCompat.isChecked()) {
-//
-//                    int hours = Integer.parseInt(hoursSpinner.getSelectedItem().toString());
-//                    int minutes = Integer.parseInt(minutesSpinner.getSelectedItem().toString());
-//                    int seconds = Integer.parseInt(secondsSpinner.getSelectedItem().toString());
-//
-//                    SharedPrefsUtil.putIntData(MainActivity.this, HOURS, hours);
-//                    SharedPrefsUtil.putIntData(MainActivity.this, MINUTES, minutes);
-//                    SharedPrefsUtil.putIntData(MainActivity.this, SECONDS, seconds);
-//
-//                    Intent intent = new Intent(MainActivity.this, StartLockService.class);
-//                    startService(intent);
-//                    SharedPrefsUtil.putBooleanData(MainActivity.this, ISLOCK, true);
-//
-//                    NotificationCompat.Builder builder = new NotificationCompat.Builder(MainActivity.this)
-//                            .setContentTitle(getString(R.string.app_name) + " service is running")
-//                            .setSmallIcon(R.mipmap.ic_launcher_round);
-//
-//                    Notification notification = builder.build();
-//
-//                    notification.flags |= Notification.FLAG_NO_CLEAR
-//                            | Notification.FLAG_ONGOING_EVENT;
-//                    NotificationManager notifier = (NotificationManager)
-//                            getSystemService(Context.NOTIFICATION_SERVICE);
-//                    notifier.notify(1, notification);
-//                } else {
-//                    SharedPrefsUtil.putBooleanData(MainActivity.this, ISLOCK, false);
-//                    stopService(new Intent(MainActivity.this, StartLockService.class));
-//                }
-//                finish();
-//                break;
+                if (mSwitchCompat.isChecked()) {
 
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    if (!Settings.canDrawOverlays(this)) {
-                        Intent permissionActivityIntent = new Intent(this, PermissionActivity.class);
-                        permissionActivityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        startActivity(permissionActivityIntent);
+                    int hours = Integer.parseInt(hoursSpinner.getSelectedItem().toString());
+                    int minutes = Integer.parseInt(minutesSpinner.getSelectedItem().toString());
+                    int seconds = Integer.parseInt(secondsSpinner.getSelectedItem().toString());
 
-                        LockscreenUtil.getInstance(this).getPermissionCheckSubject()
-                                .subscribeOn(AndroidSchedulers.mainThread())
-                                .subscribe(
-                                        new Action1<Boolean>() {
-                                            @Override
-                                            public void call(Boolean aBoolean) {
-                                                startActivity(new Intent(MainActivity.this, LockNoPasscode.class));
-                                            }
-                                        }
-                                );
-                    } else {
-                        startActivity(new Intent(this, LockNoPasscode.class));
-                    }
-                } else {
-                    startActivity(new Intent(this, LockNoPasscode.class));
+                    SharedPrefsUtil.putIntData(MainActivity.this, HOURS, hours);
+                    SharedPrefsUtil.putIntData(MainActivity.this, MINUTES, minutes);
+                    SharedPrefsUtil.putIntData(MainActivity.this, SECONDS, seconds);
+
+                    Intent intent = new Intent(MainActivity.this, StartLockService.class);
+                    startService(intent);
+                    SharedPrefsUtil.putBooleanData(MainActivity.this, ISLOCK, true);
+
+                    NotificationCompat.Builder builder = new NotificationCompat.Builder(MainActivity.this)
+                            .setContentTitle(getString(R.string.app_name) + " service is running")
+                            .setSmallIcon(R.mipmap.ic_launcher_round);
+
+                    Notification notification = builder.build();
+
+                    notification.flags |= Notification.FLAG_NO_CLEAR
+                            | Notification.FLAG_ONGOING_EVENT;
+                    NotificationManager notifier = (NotificationManager)
+                            getSystemService(Context.NOTIFICATION_SERVICE);
+                    notifier.notify(1, notification);
                 }
+                finish();
                 break;
         }
     }
