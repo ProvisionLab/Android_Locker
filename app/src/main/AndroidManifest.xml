@@ -47,7 +47,9 @@
             android:name=".activity.PermissionActivity"
             android:screenOrientation="portrait" />
 
-        <service android:name=".service.StartLockService" />
+        <service
+            android:name=".service.StartLockService"
+            android:stopWithTask="false" />
 
         <activity
             android:name=".activity.MainActivity"

@@ -1,15 +1,11 @@
 package com.dev.joks.lockscreen.activity;
 
 import android.Manifest;
-import android.app.Notification;
-import android.app.NotificationManager;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SwitchCompat;
 import android.util.Log;
@@ -127,9 +123,6 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         mSwitchCompat.setChecked(true);
                     }
-                } else {
-                    SharedPrefsUtil.putBooleanData(MainActivity.this, ISLOCK, false);
-                    stopService(new Intent(MainActivity.this, StartLockService.class));
                 }
             }
         });
@@ -254,18 +247,6 @@ public class MainActivity extends AppCompatActivity {
                     Intent intent = new Intent(MainActivity.this, StartLockService.class);
                     startService(intent);
                     SharedPrefsUtil.putBooleanData(MainActivity.this, ISLOCK, true);
-
-                    NotificationCompat.Builder builder = new NotificationCompat.Builder(MainActivity.this)
-                            .setContentTitle(getString(R.string.app_name) + " service is running")
-                            .setSmallIcon(R.mipmap.ic_launcher_round);
-
-                    Notification notification = builder.build();
-
-                    notification.flags |= Notification.FLAG_NO_CLEAR
-                            | Notification.FLAG_ONGOING_EVENT;
-                    NotificationManager notifier = (NotificationManager)
-                            getSystemService(Context.NOTIFICATION_SERVICE);
-                    notifier.notify(1, notification);
                 }
                 finish();
                 break;

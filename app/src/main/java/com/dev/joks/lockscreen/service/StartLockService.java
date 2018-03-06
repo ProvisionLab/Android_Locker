@@ -1,16 +1,21 @@
 package com.dev.joks.lockscreen.service;
 
+import android.app.Notification;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.os.IBinder;
 import android.provider.Settings;
+import android.support.v7.app.NotificationCompat;
 import android.util.Log;
 
 import com.dev.joks.lockscreen.LockscreenUtil;
+import com.dev.joks.lockscreen.R;
 import com.dev.joks.lockscreen.SharedPrefsUtil;
 import com.dev.joks.lockscreen.activity.LockNoPasscode;
+import com.dev.joks.lockscreen.activity.PasswordActivity;
 import com.dev.joks.lockscreen.activity.PermissionActivity;
 import com.dev.joks.lockscreen.event.ServiceStoppedEvent;
 
@@ -39,6 +44,8 @@ public class StartLockService extends Service {
     private int minutes;
     private int seconds;
 
+    private static final int NOTIFICATION_ID = 99;
+
     public StartLockService() {
         EventBus.getDefault().register(this);
     }
@@ -51,6 +58,8 @@ public class StartLockService extends Service {
         minutes = SharedPrefsUtil.getIntData(this, MINUTES);
         seconds = SharedPrefsUtil.getIntData(this, SECONDS);
 
+        runAsForeground();
+
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -60,7 +69,7 @@ public class StartLockService extends Service {
             }
         }, (hours * 3600 + minutes * 60 + seconds) * TO_MILLISECONDS);
 
-        return START_STICKY;
+        return START_NOT_STICKY;
     }
 
     @Override
@@ -89,6 +98,21 @@ public class StartLockService extends Service {
         Log.d(TAG, "Stop Main Service");
 
         ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).cancel(1);
+    }
+
+    private void runAsForeground() {
+        Intent notificationIntent = new Intent(this, PasswordActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
+                notificationIntent, Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        Notification notification = new NotificationCompat.Builder(this)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentText(getString(R.string.app_name) + " service is running")
+                .setContentIntent(pendingIntent)
+                .build();
+
+        startForeground(NOTIFICATION_ID, notification);
+
     }
 
     private void startLock() {

@@ -8,11 +8,13 @@ import android.widget.Toast;
 
 import com.dev.joks.lockscreen.R;
 import com.dev.joks.lockscreen.SharedPrefsUtil;
+import com.dev.joks.lockscreen.service.StartLockService;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 
+import static com.dev.joks.lockscreen.activity.MainActivity.ISLOCK;
 import static com.dev.joks.lockscreen.activity.MainActivity.PASSWORD;
 
 public class PasswordActivity extends AppCompatActivity {
@@ -42,6 +44,8 @@ public class PasswordActivity extends AppCompatActivity {
             Toast.makeText(this, "Password incorrect!", Toast.LENGTH_SHORT).show();
         } else {
             startActivity(new Intent(this, MainActivity.class));
+            SharedPrefsUtil.putBooleanData(PasswordActivity.this, ISLOCK, false);
+            stopService(new Intent(PasswordActivity.this, StartLockService.class));
             finish();
         }
     }
