@@ -1,33 +1,31 @@
 package com.dev.joks.lockscreen.service;
 
+import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.support.v7.app.NotificationCompat;
 import android.util.Log;
 
-import com.dev.joks.lockscreen.LockscreenUtil;
 import com.dev.joks.lockscreen.R;
 import com.dev.joks.lockscreen.SharedPrefsUtil;
 import com.dev.joks.lockscreen.activity.LockNoPasscode;
 import com.dev.joks.lockscreen.activity.PasswordActivity;
-import com.dev.joks.lockscreen.activity.PermissionActivity;
 import com.dev.joks.lockscreen.event.ServiceStoppedEvent;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
+import java.util.Calendar;
 import java.util.Timer;
 import java.util.TimerTask;
-
-import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Action1;
 
 import static com.dev.joks.lockscreen.activity.MainActivity.HOURS;
 import static com.dev.joks.lockscreen.activity.MainActivity.ISLOCK;
@@ -69,7 +67,7 @@ public class StartLockService extends Service {
             }
         }, (hours * 3600 + minutes * 60 + seconds) * TO_MILLISECONDS);
 
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
 
     @Override
@@ -88,6 +86,17 @@ public class StartLockService extends Service {
                 startLock();
             }
         }, (hours * 3600 + minutes * 60 + seconds) * TO_MILLISECONDS);
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        Log.d(TAG, "Task removed");
+        Intent intent = new Intent(this, StartLockService.class);
+        PendingIntent pintent = PendingIntent.getService(this, 0, intent, 0);
+        AlarmManager alarm = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        Calendar calendar = Calendar.getInstance();
+        alarm.setRepeating(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(), 30 * 1000, pintent);
     }
 
     @Override
@@ -112,32 +121,20 @@ public class StartLockService extends Service {
                 .build();
 
         startForeground(NOTIFICATION_ID, notification);
-
     }
 
     private void startLock() {
-        final Intent intent = new Intent(StartLockService.this, LockNoPasscode.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(this)) {
-                Intent permissionActivityIntent = new Intent(this, PermissionActivity.class);
-                permissionActivityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(permissionActivityIntent);
-
-                LockscreenUtil.getInstance(this).getPermissionCheckSubject()
-                        .subscribeOn(AndroidSchedulers.mainThread())
-                        .subscribe(
-                                new Action1<Boolean>() {
-                                    @Override
-                                    public void call(Boolean aBoolean) {
-                                        startActivity(intent);
-                                    }
-                                }
-                        );
-            } else {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Settings.canDrawOverlays(this)) {
+                final Intent intent = new Intent(StartLockService.this, LockNoPasscode.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
+            } else {
+                Log.d(TAG, "You need overlay permission!");
             }
         } else {
+            Intent intent = new Intent(StartLockService.this, LockNoPasscode.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
         }
     }

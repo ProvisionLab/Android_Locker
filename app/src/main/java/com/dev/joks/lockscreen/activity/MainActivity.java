@@ -3,9 +3,15 @@ package com.dev.joks.lockscreen.activity;
 import android.Manifest;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.Settings;
+import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SwitchCompat;
 import android.util.Log;
@@ -17,6 +23,7 @@ import android.widget.Spinner;
 import android.widget.Toast;
 
 import com.dev.joks.lockscreen.AdminReceiver;
+import com.dev.joks.lockscreen.LockscreenUtil;
 import com.dev.joks.lockscreen.R;
 import com.dev.joks.lockscreen.SharedPrefsUtil;
 import com.dev.joks.lockscreen.service.StartLockService;
@@ -32,6 +39,8 @@ import java.io.File;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action1;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -66,32 +75,43 @@ public class MainActivity extends AppCompatActivity {
     @BindView(R.id.new_pass_repeat)
     EditText newPasswordRepeatEditText;
 
+    private String deviceManufacturer;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
 //        getWindow().addFlags(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+        deviceManufacturer = android.os.Build.MANUFACTURER;
 
-        Dexter.withActivity(this)
-                .withPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                .withListener(new PermissionListener() {
-                    @Override
-                    public void onPermissionGranted(PermissionGrantedResponse response) {
-                        createFolder();
-                    }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                == PackageManager.PERMISSION_GRANTED) {
+            createFolder();
+        } else {
+            Dexter.withActivity(this)
+                    .withPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    .withListener(new PermissionListener() {
+                        @Override
+                        public void onPermissionGranted(PermissionGrantedResponse response) {
+                            createFolder();
+//                        Intent intent = new Intent();
+//                        intent.setAction("android.app.action.SET_NEW_PASSWORD");
+//                        startActivity(intent);
+                        }
 
-                    @Override
-                    public void onPermissionDenied(PermissionDeniedResponse response) {
-                        Toast.makeText(MainActivity.this, "You need this permission for creating empty folder", Toast.LENGTH_SHORT).show();
-                    }
+                        @Override
+                        public void onPermissionDenied(PermissionDeniedResponse response) {
+                            Toast.makeText(MainActivity.this, "You need this permission for creating empty folder", Toast.LENGTH_SHORT).show();
+                        }
 
-                    @Override
-                    public void onPermissionRationaleShouldBeShown(PermissionRequest permission, PermissionToken token) {
-                        token.continuePermissionRequest();
-                    }
-                })
-                .check();
+                        @Override
+                        public void onPermissionRationaleShouldBeShown(PermissionRequest permission, PermissionToken token) {
+                            token.continuePermissionRequest();
+                        }
+                    })
+                    .check();
+        }
 
         policyManager = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
         componentName = new ComponentName(this, AdminReceiver.class);
@@ -126,6 +146,60 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
+    private void checkOverlay() {
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                Intent permissionActivityIntent = new Intent(this, PermissionActivity.class);
+                permissionActivityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(permissionActivityIntent);
+
+                LockscreenUtil.getInstance(this).getPermissionCheckSubject()
+                        .subscribeOn(AndroidSchedulers.mainThread())
+                        .subscribe(
+                                new Action1<Boolean>() {
+                                    @Override
+                                    public void call(Boolean aBoolean) {
+
+                                    }
+                                }
+                        );
+            } else {
+                Log.d(TAG, "Overlay granted!");
+            }
+        } else {
+            Log.d(TAG, "Less than M");
+
+            if (deviceManufacturer.equals("Xiaomi")) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle("Display pop-up window");
+                builder.setMessage("Please, enable popup windows displaying. " +
+                        "Go to 'Permission manager->Display pop-up window' and check this permission");
+
+                builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        Intent i = new Intent();
+                        i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                        i.addCategory(Intent.CATEGORY_DEFAULT);
+                        i.setData(Uri.parse("package:" + getPackageName()));
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+                        i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+                        startActivity(i);
+                    }
+                });
+                builder.show();
+            }
+        }
     }
 
     private boolean isDirEmpty(final File file) {
@@ -262,6 +336,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 
+        checkOverlay();
         switch (requestCode) {
             case RESULT_ENABLE:
                 if (resultCode == RESULT_OK) {

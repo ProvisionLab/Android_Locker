@@ -11,10 +11,6 @@ import android.support.annotation.Nullable;
 
 import com.dev.joks.lockscreen.LockscreenUtil;
 
-/**
- * Created by mugku on 2017. 4. 7..
- */
-
 public class PermissionActivity extends Activity {
 
     private static final int OVERLAY_CODE = 123;
